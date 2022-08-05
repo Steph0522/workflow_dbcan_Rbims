@@ -112,29 +112,28 @@ class: inverse, center, middle
 ## Funcion de lectura de archivo
 
 ```r
-dbcan_table&lt;- data_dbcan
-read_dbcan&lt;-function(dbcan_table){
-library("readr")
-library(dplyr)
-library(tidyr)
-library(stringr)
-#reading data
-dbcan_df&lt;-read.delim(dbcan_table, header = T, check.names = F)
-dbcan_df_format&lt;- suppressWarnings(dbcan_df %&gt;%
-  filter( `#ofTools` &gt;1) %&gt;%
-  separate(.data$`Gene ID`, c("Bin_name", "Scaffold_name"),
-           sep = "[_|-][s|S]caffold") %&gt;%
-  mutate(Scaffold_name = paste0( "scaffold", .data$Scaffold_name),
-         .data$Scaffold_name) %&gt;%
-  unite("Scaffold_name", c("Bin_name", "Scaffold_name"), remove=FALSE) %&gt;%
-  mutate(hmmer2=str_replace_all(HMMER, "[[:punct:]]", "\t")) %&gt;%
-  separate(hmmer2, c("dbNamesHMM"), sep="\t") %&gt;%
-  mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %&gt;%
-  separate(hotpep2, c("dbNameshotpep"), sep="\t") %&gt;%
-  mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %&gt;%
-  separate(diamond2, c("dbNamesdiamond"), sep="\t") %&gt;%
-  unite("dbCAN_names", dbNamesHMM, dbNameshotpep, dbNamesdiamond,
-        sep="_", remove = F) 
+read_dbcan&lt;-function(dbcan_path){
+  ruta_dbcan&lt;-dbcan_path
+  # Load all the data tables results ---------------------------------------####
+  lapply_read_delim_bind_rows &lt;- function(path, pattern = "*overview.txt"){
+    files = list.files(path, pattern, full.names = TRUE)
+    lapply(files, read_delim, delim="\t") %&gt;% bind_rows()
+  }
+  dbcan_df&lt;-lapply_read_delim_bind_rows(ruta_dbcan)
+  # Reading data ----------------------------------------------------------####
+  dbcan_df_format&lt;- suppressWarnings(
+    dbcan_df %&gt;%
+      filter( `#ofTools` &gt;1) %&gt;%
+      rename(Bin_name=`Gene ID`) %&gt;%
+      mutate( hmmer2=str_replace_all(HMMER, "[[:punct:]]",  "\t")) %&gt;%
+      separate(hmmer2, c("dbNamesHMM"),  sep="\t") %&gt;%
+      mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %&gt;%
+      separate(hotpep2, c("dbNameshotpep"), sep="\t") %&gt;%
+      mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %&gt;%
+      separate(diamond2, c("dbNamesdiamond"),msep="\t") %&gt;%
+      unite("dbCAN_names", dbNamesHMM, dbNameshotpep,  dbNamesdiamond, 
+           sep="_", remove = F) %&gt;%  
+      mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) 
 ```
 ---
 
@@ -142,27 +141,34 @@ dbcan_df_format&lt;- suppressWarnings(dbcan_df %&gt;%
 
 
 ```r
-%&gt;% mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) %&gt;%
-  separate(dbCAN_names, c("dbCAN_names"), sep="_") %&gt;%
-  mutate(dbCAN = case_when(
-    str_detect(dbCAN_names, "CBM") ~ "carbohydrate-binding module [CBM]",
-    str_detect(dbCAN_names, "CE") ~ "carbohydrate esterases [CEs]",
-    str_detect(dbCAN_names, "GH") ~ "glycoside hydrolases [GHs]",
-    str_detect(dbCAN_names, "GT") ~ "glycosyltransferases [GTs]",
-    str_detect(dbCAN_names, "PL") ~ "polysaccharide lyases [PLs]"
-  ))   %&gt;%
-  mutate(across(where(is.character), str_trim)))
+%&gt;%
+      separate(dbCAN_names, c("dbCAN_names"), sep="_") %&gt;%
+      utate(dbCAN = case_when(str_detect(dbCAN_names, "CBM") ~ 
+                                "carbohydrate-binding module [CBM]",
+                              str_detect(dbCAN_names, "CE") ~ 
+                                "carbohydrate esterases [CEs]",
+                              str_detect(dbCAN_names, "GH") ~ 
+                                "glycoside hydrolases [GHs]",
+                              str_detect(dbCAN_names, "GT") ~ 
+                                "glycosyltransferases [GTs]",
+                              str_detect(dbCAN_names, "PL") ~ 
+                                "polysaccharide lyases [PLs]"))  %&gt;%
+      mutate(across(where(is.character), str_trim))) %&gt;%
+    dplyr::select(Bin_name,dbCAN_names) %&gt;%
+    calc_abundance(analysis = "dbCAN") %&gt;% 
+    dplyr::select(-Scaffold_name)
+  # Menssage --------------------------------------------------------------####
+  initial&lt;-dim(dbcan_df)
+  final&lt;-dim(dbcan_df %&gt;%
+               filter( `#ofTools` &gt;1))
+  signals&lt;- dbcan_df %&gt;% group_by(Signalp) %&gt;% count()
 
-initial&lt;-dim(dbcan_df)
-final&lt;-dim(dbcan_df %&gt;%
-      filter( `#ofTools` &gt;1))
-signals&lt;- dbcan_df %&gt;% group_by(Signalp) %&gt;% count()
+  print(paste0("Input Genes = " , initial[1]))
+  print(paste0("Output filtered Genes = " , final[1]))
+  print(paste0("Percentage remained = " , round(final[1]/initial[1]*100), "%"))
+  print(paste0("Number of Genes with no signals = " , signals[2]))
 
-print(paste0("Input scaffolds = " , initial[1]))
-print(paste0("Output filtered = " , final[1]))
-print(paste0("Percentage remained = " , round(final[1]/initial[1]*100), "%"))
-print(paste0("Number of scaffolds with no signals = " , signals[2]))
-return(dbcan_df)
+  return(dbcan_df_format)
 }
 ```
 
