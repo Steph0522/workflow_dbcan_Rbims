@@ -41,7 +41,13 @@ El metaservidor dbCAN2 es una versión actualizada del servidor web dbCAN origin
 
 El programa que ocupamo 'run_dbcan3' es es una herramienta que utiliza este servidor creado en su versión conda reescrito por Huang Lee; la versión V1 version fue escrita por  Tanner Yohe
 ---
+## Creación de un paquete en GitHub 
 
+https://github.com/Steph0522/Rbims_workflow [link](https://github.com/Steph0522/Rbims_workflow)
+
+
+
+---
 # Instalación de dbCAN y base de datos
 
 Instala  **run_dbcan3** de [Github](https://github.com/linnabrown/run_dbcan):
