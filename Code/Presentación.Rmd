@@ -590,7 +590,33 @@ bubble_dbcan<-function(tibble_dbcan,
 
 ```
 
-```{r, eval=FALSE}
+```{r, echo=TRUE, eval=FALSE}
+
+#Generamos un archivo de ejemplo de metadatos
+Metadatos<- data.frame(
+  Bin_name = unique(table_test$Bin_name),
+  Specie = c("Specie_a",
+             "Specie_b", 
+             "Specie_c",
+             "Specie_d", 
+             "Specie_e", "Specie_f")) 
+
+#Corremos la función bubble plot
+bubble_dbcan(tibble_dbcan = table_test,
+            x_axis = Bin_name, 
+            y_axis = dbCAN,
+            range_size = c(1,10),
+            data_experiment = Metadatos,
+            color_character = Specie,
+            y_labs=FALSE,
+            x_labs=FALSE)  
+```
+
+---
+
+# Plot
+
+```{r,  echo=FALSE, fig.width=10, fig.align='center'}
 Metadatos<- data.frame(
   Bin_name = unique(table_test$Bin_name),
   Specie = c("Specie_a", "Specie_b", "Specie_c",

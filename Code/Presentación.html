@@ -289,10 +289,16 @@ bubble_dbcan&lt;-function(tibble_dbcan,
 
 
 ```r
+#Generamos un archivo de ejemplo de metadatos
 Metadatos&lt;- data.frame(
   Bin_name = unique(table_test$Bin_name),
-  Specie = c("Specie_a", "Specie_b", "Specie_c",
-             "Specie_d", "Specie_e", "Specie_f")) 
+  Specie = c("Specie_a",
+             "Specie_b", 
+             "Specie_c",
+             "Specie_d", 
+             "Specie_e", "Specie_f")) 
+
+#Corremos la función bubble plot
 bubble_dbcan(tibble_dbcan = table_test,
             x_axis = Bin_name, 
             y_axis = dbCAN,
@@ -302,6 +308,12 @@ bubble_dbcan(tibble_dbcan = table_test,
             y_labs=FALSE,
             x_labs=FALSE)  
 ```
+
+---
+
+# Plot
+
+&lt;img src="Presentación_files/figure-html/unnamed-chunk-8-1.png" style="display: block; margin: auto;" /&gt;
 
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
