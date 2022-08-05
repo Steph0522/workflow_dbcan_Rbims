@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Presentación grupo 5 : Rbims - dbCAN</title>
+    <meta charset="utf-8" />
+    <meta name="date" content="2022-08-04" />
+    <script src="Presentación_files/header-attrs/header-attrs.js"></script>
+    <link href="Presentación_files/remark-css/default.css" rel="stylesheet" />
+    <link href="Presentación_files/remark-css/metropolis-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Presentación grupo 5 : Rbims - dbCAN
+]
+.subtitle[
+## Nuevo workflow para trabajar con datos provenientes de dbCAN
+]
+.date[
+### 2022-08-04
+]
+
+---
+
+
+background-image: url(https://raw.githubusercontent.com/mirnavazquez/RbiMs/main/man/figures/Logo-rRbiMs.png)
+background-position: center
+background-size: contain
+
+
+
+
+---
+background-image: url(../Images/imagen.png)
+background-position: center
+background-size: contain
+
+---
+class: inverse, center, middle
+
+# ¿Qué es dbCAN?
+
+
+---
+class: center, middle
+
+# dbCAN
+El metaservidor dbCAN es un servidor web para la anotación automática de enzimas activas de carbohidratos, financiado por la Fundación Nacional de Ciencias. Recursos similares en la web incluyen CAZy, CAT (obsoleto) y dbCAN-sub. 
+
+El metaservidor dbCAN2 es una versión actualizada del servidor web dbCAN original.
+
+El programa que ocupamo 'run_dbcan3' es es una herramienta que utiliza este servidor creado en su versión conda reescrito por Huang Lee; la versión V1 version fue escrita por  Tanner Yohe
+---
+
+# Instalación de dbCAN y base de datos
+
+Instala  **run_dbcan3** de [Github](https://github.com/linnabrown/run_dbcan):
+
+```{.sh}
+conda create -n run_dbcan python=3.8 dbcan -c conda-forge -c bioconda
+conda activate run_dbcan 
+```
+
+La base de datos:  
+```{.sh}
+test -d db || mkdir db
+cd db \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/CAZyDB.09242021.fa &amp;&amp; diamond makedb --in CAZyDB.09242021.fa -d CAZy \
+    &amp;&amp; wget https://bcb.unl.edu/dbCAN2/download/Databases/V10/dbCAN-HMMdb-V10.txt &amp;&amp; mv dbCAN-HMMdb-V10.txt dbCAN.txt &amp;&amp; hmmpress dbCAN.txt \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Databases/tcdb.fa &amp;&amp; diamond makedb --in tcdb.fa -d tcdb \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Databases/tf-1.hmm &amp;&amp; hmmpress tf-1.hmm \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Databases/tf-2.hmm &amp;&amp; hmmpress tf-2.hmm \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Databases/stp.hmm &amp;&amp; hmmpress stp.hmm \
+    &amp;&amp; cd ../ &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Samples/EscheriaColiK12MG1655.fna \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Samples/EscheriaColiK12MG1655.faa \
+    &amp;&amp; wget http://bcb.unl.edu/dbCAN2/download/Samples/EscheriaColiK12MG1655.gff
+```
+
+---
+# Instalación de SignalP (Signalp Petitide prediction)
+```{.bash}
+mkdir -p run_dbcan/tools &amp;&amp; run_dbcan/tools/
+tar -xvf signalp-4.1g.Linux.tar.gz &amp;&amp; cd signalp-4.1
+```
+
+# Corriendo dbcan
+
+```{.bash}
+run_dbcan mibin.fna prok --out_dir output_mibin --use_signalP=TRUE -sp /home/user/Downloads/signalp-4.1/signalp 
+
+```
+---
+class: inverse, center, middle
+
+# Haciendo las funciones
+
+---
+
+## Funcion de lectura de archivo
+
+```r
+dbcan_table&lt;- data_dbcan
+read_dbcan&lt;-function(dbcan_table){
+library("readr")
+library(dplyr)
+library(tidyr)
+library(stringr)
+#reading data
+dbcan_df&lt;-read.delim(dbcan_table, header = T, check.names = F)
+dbcan_df_format&lt;- suppressWarnings(dbcan_df %&gt;%
+  filter( `#ofTools` &gt;1) %&gt;%
+  separate(.data$`Gene ID`, c("Bin_name", "Scaffold_name"),
+           sep = "[_|-][s|S]caffold") %&gt;%
+  mutate(Scaffold_name = paste0( "scaffold", .data$Scaffold_name),
+         .data$Scaffold_name) %&gt;%
+  unite("Scaffold_name", c("Bin_name", "Scaffold_name"), remove=FALSE) %&gt;%
+  mutate(hmmer2=str_replace_all(HMMER, "[[:punct:]]", "\t")) %&gt;%
+  separate(hmmer2, c("dbNamesHMM"), sep="\t") %&gt;%
+  mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %&gt;%
+  separate(hotpep2, c("dbNameshotpep"), sep="\t") %&gt;%
+  mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %&gt;%
+  separate(diamond2, c("dbNamesdiamond"), sep="\t") %&gt;%
+  unite("dbCAN_names", dbNamesHMM, dbNameshotpep, dbNamesdiamond,
+        sep="_", remove = F) 
+```
+---
+
+## Funcion de lectura de archivo
+
+
+```r
+%&gt;% mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) %&gt;%
+  separate(dbCAN_names, c("dbCAN_names"), sep="_") %&gt;%
+  mutate(dbCAN = case_when(
+    str_detect(dbCAN_names, "CBM") ~ "carbohydrate-binding module [CBM]",
+    str_detect(dbCAN_names, "CE") ~ "carbohydrate esterases [CEs]",
+    str_detect(dbCAN_names, "GH") ~ "glycoside hydrolases [GHs]",
+    str_detect(dbCAN_names, "GT") ~ "glycosyltransferases [GTs]",
+    str_detect(dbCAN_names, "PL") ~ "polysaccharide lyases [PLs]"
+  ))   %&gt;%
+  mutate(across(where(is.character), str_trim)))
+
+initial&lt;-dim(dbcan_df)
+final&lt;-dim(dbcan_df %&gt;%
+      filter( `#ofTools` &gt;1))
+signals&lt;- dbcan_df %&gt;% group_by(Signalp) %&gt;% count()
+
+print(paste0("Input scaffolds = " , initial[1]))
+print(paste0("Output filtered = " , final[1]))
+print(paste0("Percentage remained = " , round(final[1]/initial[1]*100), "%"))
+print(paste0("Number of scaffolds with no signals = " , signals[2]))
+return(dbcan_df)
+}
+```
+
+
+---
+## Probando la función
+
+
+```r
+data_dbcan&lt;-"../Data/Prueba1_Bin_154_2_1.fna.faaoverview.txt"
+table_test&lt;-read_dbcan(dbcan_table = data_dbcan)
+```
+
+```
+## [1] "Input scaffolds = 124"
+## [1] "Output filtered = 47"
+## [1] "Percentage remained = 38%"
+## [1] "Number of scaffolds with no signals = 124"
+```
+
+```r
+head(table_test[-1], n = 4)
+```
+
+```
+##                Bin_name                      HMMER   Hotpep DIAMOND Signalp #ofTools
+## 1 Meg22_810_Bin_154_2_1               GT51(66-234) GT51(23)    GT51       N        3
+## 2 Meg22_810_Bin_154_2_1 GH42(1-334)+GH164(186-597)        -    GH42       N        2
+## 3 Meg22_810_Bin_154_2_1                GH4(10-186)   GH4(1)     GH4       N        3
+## 4 Meg22_810_Bin_154_2_1                 CE9(7-377)   CE9(2)       -       N        2
+##   dbCAN_names dbNamesHMM dbNameshotpep dbNamesdiamond                        dbCAN
+## 1        GT51       GT51          GT51           GT51   glycosyltransferases [GTs]
+## 2        GH42       GH42                         GH42   glycoside hydrolases [GHs]
+## 3         GH4        GH4           GH4            GH4   glycoside hydrolases [GHs]
+## 4         CE9        CE9           CE9                carbohydrate esterases [CEs]
+```
+
+---
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
