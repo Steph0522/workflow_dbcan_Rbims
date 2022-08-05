@@ -24,6 +24,15 @@ class: center, middle, inverse, title-slide
 
 ---
 
+&gt; ####Roberto
+&gt; ####Nelly 
+&gt; ####Ulises
+&gt; ####Julián
+&gt; ####Andrés
+&gt; ####Stephanie
+&gt; ####Mirna y Joselyn
+
+---
 
 background-image: url(https://raw.githubusercontent.com/mirnavazquez/RbiMs/main/man/figures/Logo-rRbiMs.png)
 background-position: center
@@ -73,15 +82,11 @@ https://github.com/Steph0522/Rbims_workflow
 
 .pull-left[
 
-&gt; ####github
-
 &gt; ####data
 
 &gt; ####docs
 
 &gt; ####tests
-
-&gt; #### inst
 
 &gt; #### vignettes
 
@@ -94,16 +99,18 @@ https://github.com/Steph0522/Rbims_workflow
 
 .pull-right[
 
-&gt; ####R (se agregó una nueva función)
+&gt; ####R (se agregaron dos nuevas función)
 
-  read_dbcan (2022_08_05-READ-read_dbCAN.R)
+  `read_dbcan` (2022_08_05-READ-read_dbCAN.R)
+  `bubble_dbcan` (2022_08_05-READ-read_dbCAN.R)
+
     
    Objetivos:
    
        Leer output de dbcan
-       Filtrar nombres de bins
-       Filtrar bins sin señal
+       Filtrar nombres y señal de bins
        Calcular estadísticas
+       Graficar un bubble plot 
 ]
 
 
@@ -143,8 +150,9 @@ tar -xvf signalp-4.1g.Linux.tar.gz &amp;&amp; cd signalp-4.1
 # Corriendo dbcan
 
 ```{.bash}
-run_dbcan mibin.fna prok --out_dir output_mibin --use_signalP=TRUE -sp /home/user/Downloads/signalp-4.1/signalp 
+for x in $(ls /home/user04/07.Bins/Proteoma/*.faa | cut -d "_" -f 1-3 | cut -d "/" -f 6); do mkdir ${x} ; done
 
+for x in $(ls /home/user04/07.Bins/Proteoma/*.faa | cut -d "_" -f 1-3 | cut -d "/" -f 6); do run_dbcan /home/user04/07.Bins/Proteoma/${x}_renamed.fa.faa protein --out_dir /home/megadriveCURSO/user04/15.test_dbCan/${x}/ --db_dir /home/mirna/db/ --use_signalP=TRUE -sp /home/megadriveCURSO/mirna/run_dbcan/tools/signalp-4.1/signalp; done
 ```
 ---
 class: inverse, center, middle
@@ -167,17 +175,18 @@ read_dbcan&lt;-function(dbcan_path){
   # Reading data ----------------------------------------------------------####
   dbcan_df_format&lt;- suppressWarnings(
     dbcan_df %&gt;%
-      filter( `#ofTools` &gt;1) %&gt;%
-      rename(Bin_name=`Gene ID`) %&gt;%
-      mutate( hmmer2=str_replace_all(HMMER, "[[:punct:]]",  "\t")) %&gt;%
-      separate(hmmer2, c("dbNamesHMM"),  sep="\t") %&gt;%
-      mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %&gt;%
-      separate(hotpep2, c("dbNameshotpep"), sep="\t") %&gt;%
-      mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %&gt;%
-      separate(diamond2, c("dbNamesdiamond"),msep="\t") %&gt;%
-      unite("dbCAN_names", dbNamesHMM, dbNameshotpep,  dbNamesdiamond, 
+      filter( .data$`#ofTools` &gt;1) %&gt;%
+      rename(Bin_name=.data$`Gene ID`) %&gt;%
+      mutate( hmmer2=str_replace_all(.data$HMMER, "[[:punct:]]",  "\t")) %&gt;%
+      separate(.data$hmmer2, c("dbNamesHMM"),  sep="\t") %&gt;%
+      mutate(hotpep2=str_replace_all(.data$Hotpep, "[[:punct:]]", "\t")) %&gt;%
+      separate(.data$hotpep2, c("dbNameshotpep"), sep="\t") %&gt;%
+      mutate(diamond2=str_replace_all(.data$DIAMOND, "[[:punct:]]", "\t")) %&gt;%
+      separate(.data$diamond2, c("dbNamesdiamond"), sep="\t") %&gt;%
+      unite("dbCAN_names", .data$dbNamesHMM, .data$dbNameshotpep,  .data$dbNamesdiamond, 
            sep="_", remove = F) %&gt;%  
-      mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) 
+      mutate(dbCAN_names=str_replace_all(.data$dbCAN_names, "^_", "")) %&gt;%
+      separate(.data$dbCAN_names, c("dbCAN_names"), sep="_") 
 ```
 ---
 
@@ -185,27 +194,25 @@ read_dbcan&lt;-function(dbcan_path){
 
 
 ```r
-%&gt;%
-      separate(dbCAN_names, c("dbCAN_names"), sep="_") %&gt;%
-      utate(dbCAN = case_when(str_detect(dbCAN_names, "CBM") ~ 
+%&gt;% mutate(dbCAN = case_when(str_detect(.data$dbCAN_names, "CBM") ~ 
                                 "carbohydrate-binding module [CBM]",
-                              str_detect(dbCAN_names, "CE") ~ 
+                              str_detect(.data$dbCAN_names, "CE") ~ 
                                 "carbohydrate esterases [CEs]",
-                              str_detect(dbCAN_names, "GH") ~ 
+                              str_detect(.data$dbCAN_names, "GH") ~ 
                                 "glycoside hydrolases [GHs]",
-                              str_detect(dbCAN_names, "GT") ~ 
+                              str_detect(.data$dbCAN_names, "GT") ~ 
                                 "glycosyltransferases [GTs]",
-                              str_detect(dbCAN_names, "PL") ~ 
-                                "polysaccharide lyases [PLs]"))  %&gt;%
-      mutate(across(where(is.character), str_trim))) %&gt;%
-    dplyr::select(Bin_name,dbCAN_names) %&gt;%
+                              str_detect(.data$dbCAN_names, "PL") ~ 
+                                "polysaccharide lyases [PLs]")) %&gt;%
+      mutate_if(is.character, str_trim) %&gt;%
+    dplyr::select(.data$Bin_name, .data$dbCAN_names) %&gt;%
     calc_abundance(analysis = "dbCAN") %&gt;% 
-    dplyr::select(-Scaffold_name)
+    dplyr::select(-.data$Scaffold_name))
   # Menssage --------------------------------------------------------------####
   initial&lt;-dim(dbcan_df)
   final&lt;-dim(dbcan_df %&gt;%
-               filter( `#ofTools` &gt;1))
-  signals&lt;- dbcan_df %&gt;% group_by(Signalp) %&gt;% count()
+               filter( .data$`#ofTools` &gt;1))
+  signals&lt;- dbcan_df %&gt;% group_by(.data$Signalp) %&gt;% count()
 
   print(paste0("Input Genes = " , initial[1]))
   print(paste0("Output filtered Genes = " , final[1]))
@@ -217,44 +224,84 @@ read_dbcan&lt;-function(dbcan_path){
 ```
 
 
+
 ---
 ## Probando la función
 
 
 ```r
-data_dbcan&lt;-"../Data/Prueba1_Bin_154_2_1.fna.faaoverview.txt"
-table_test&lt;-read_dbcan(dbcan_table = data_dbcan)
+data_dbcan&lt;-"../Data/"
+table_test&lt;-read_dbcan(data_dbcan)
 ```
 
 ```
-## [1] "Input scaffolds = 124"
-## [1] "Output filtered = 47"
-## [1] "Percentage remained = 38%"
-## [1] "Number of scaffolds with no signals = 124"
+## [1] "Input Genes = 1206"
+## [1] "Output filtered Genes = 265"
+## [1] "Percentage remained = 22%"
+## [1] "Number of Genes with no signals = 1206"
 ```
 
 ```r
-head(table_test[-1], n = 4)
+head(table_test)
 ```
 
 ```
-##                Bin_name                      HMMER   Hotpep DIAMOND Signalp
-## 1 Meg22_810_Bin_154_2_1               GT51(66-234) GT51(23)    GT51       N
-## 2 Meg22_810_Bin_154_2_1 GH42(1-334)+GH164(186-597)        -    GH42       N
-## 3 Meg22_810_Bin_154_2_1                GH4(10-186)   GH4(1)     GH4       N
-## 4 Meg22_810_Bin_154_2_1                 CE9(7-377)   CE9(2)       -       N
-##   #ofTools dbCAN_names dbNamesHMM dbNameshotpep dbNamesdiamond
-## 1        3        GT51       GT51          GT51           GT51
-## 2        2        GH42       GH42                         GH42
-## 3        3         GH4        GH4           GH4            GH4
-## 4        2         CE9        CE9           CE9               
-##                          dbCAN
-## 1   glycosyltransferases [GTs]
-## 2   glycoside hydrolases [GHs]
-## 3   glycoside hydrolases [GHs]
-## 4 carbohydrate esterases [CEs]
+## # A tibble: 6 × 3
+##   Bin_name         dbCAN Abundance
+##   &lt;chr&gt;            &lt;chr&gt;     &lt;int&gt;
+## 1 Meg22_46_Bin_204 GH51          1
+## 2 Meg22_46_Bin_204 GT2           3
+## 3 Meg22_46_Bin_204 PL10          1
+## 4 Meg22_46_Bin_204 GH32          1
+## 5 Meg22_46_Bin_204 GH141         4
+## 6 Meg22_46_Bin_204 GH36          1
 ```
+---
 
+# Funcion para la visualización de datos en bubble plot
+
+[Liga a la función](https://github.com/Steph0522/Rbims_workflow/blob/main/R/2022_08_05-PLOT-bubble_dbcan.R)
+
+
+```r
+bubble_dbcan&lt;-function(tibble_dbcan,
+                    x_axis, 
+                    y_axis,
+                    data_experiment=NULL,
+                    color_character=NULL,
+                    order_bins=NULL,
+                    order_metabolism=NULL,
+                    color_pallet=NULL, 
+                    range_size=NULL,
+                    x_labs=TRUE,
+                    y_labs=TRUE,
+                    text_x=NULL,
+                    text_y=NULL){
+ ..........
+  return(plot_bubble)
+}
+```
+---
+
+# Corriendo la función de bubble plot
+
+
+
+
+```r
+Metadatos&lt;- data.frame(
+  Bin_name = unique(table_test$Bin_name),
+  Specie = c("Specie_a", "Specie_b", "Specie_c",
+             "Specie_d", "Specie_e", "Specie_f")) 
+bubble_dbcan(tibble_dbcan = table_test,
+            x_axis = Bin_name, 
+            y_axis = dbCAN,
+            range_size = c(1,10),
+            data_experiment = Metadatos,
+            color_character = Specie,
+            y_labs=FALSE,
+            x_labs=FALSE)  
+```
 
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>

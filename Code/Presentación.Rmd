@@ -10,6 +10,15 @@ output:
       highlightLines: true
       countIncrementalSlides: false
 ---
+> ####Roberto
+> ####Nelly 
+> ####Ulises
+> ####Julián
+> ####Andrés
+> ####Stephanie
+> ####Mirna y Joselyn
+
+---
 
 background-image: url(https://raw.githubusercontent.com/mirnavazquez/RbiMs/main/man/figures/Logo-rRbiMs.png)
 background-position: center
@@ -61,15 +70,11 @@ https://github.com/Steph0522/Rbims_workflow
 
 .pull-left[
 
-> ####github
-
 > ####data
 
 > ####docs
 
 > ####tests
-
-> #### inst
 
 > #### vignettes
 
@@ -82,16 +87,18 @@ https://github.com/Steph0522/Rbims_workflow
 
 .pull-right[
 
-> ####R (se agregó una nueva función)
+> ####R (se agregaron dos nuevas función)
 
-  read_dbcan (2022_08_05-READ-read_dbCAN.R)
+  `read_dbcan` (2022_08_05-READ-read_dbCAN.R)
+  `bubble_dbcan` (2022_08_05-READ-read_dbCAN.R)
+
     
    Objetivos:
    
        Leer output de dbcan
-       Filtrar nombres de bins
-       Filtrar bins sin señal
+       Filtrar nombres y señal de bins
        Calcular estadísticas
+       Graficar un bubble plot 
 ]
 
 
@@ -131,8 +138,9 @@ tar -xvf signalp-4.1g.Linux.tar.gz && cd signalp-4.1
 # Corriendo dbcan
 
 ```{.bash}
-run_dbcan mibin.fna prok --out_dir output_mibin --use_signalP=TRUE -sp /home/user/Downloads/signalp-4.1/signalp 
+for x in $(ls /home/user04/07.Bins/Proteoma/*.faa | cut -d "_" -f 1-3 | cut -d "/" -f 6); do mkdir ${x} ; done
 
+for x in $(ls /home/user04/07.Bins/Proteoma/*.faa | cut -d "_" -f 1-3 | cut -d "/" -f 6); do run_dbcan /home/user04/07.Bins/Proteoma/${x}_renamed.fa.faa protein --out_dir /home/megadriveCURSO/user04/15.test_dbCan/${x}/ --db_dir /home/mirna/db/ --use_signalP=TRUE -sp /home/megadriveCURSO/mirna/run_dbcan/tools/signalp-4.1/signalp; done
 ```
 ---
 class: inverse, center, middle
@@ -154,18 +162,18 @@ read_dbcan<-function(dbcan_path){
   # Reading data ----------------------------------------------------------####
   dbcan_df_format<- suppressWarnings(
     dbcan_df %>%
-      filter( `#ofTools` >1) %>%
-      rename(Bin_name=`Gene ID`) %>%
-      mutate( hmmer2=str_replace_all(HMMER, "[[:punct:]]",  "\t")) %>%
-      separate(hmmer2, c("dbNamesHMM"),  sep="\t") %>%
-      mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %>%
-      separate(hotpep2, c("dbNameshotpep"), sep="\t") %>%
-      mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %>%
-      separate(diamond2, c("dbNamesdiamond"),msep="\t") %>%
-      unite("dbCAN_names", dbNamesHMM, dbNameshotpep,  dbNamesdiamond, 
+      filter( .data$`#ofTools` >1) %>%
+      rename(Bin_name=.data$`Gene ID`) %>%
+      mutate( hmmer2=str_replace_all(.data$HMMER, "[[:punct:]]",  "\t")) %>%
+      separate(.data$hmmer2, c("dbNamesHMM"),  sep="\t") %>%
+      mutate(hotpep2=str_replace_all(.data$Hotpep, "[[:punct:]]", "\t")) %>%
+      separate(.data$hotpep2, c("dbNameshotpep"), sep="\t") %>%
+      mutate(diamond2=str_replace_all(.data$DIAMOND, "[[:punct:]]", "\t")) %>%
+      separate(.data$diamond2, c("dbNamesdiamond"), sep="\t") %>%
+      unite("dbCAN_names", .data$dbNamesHMM, .data$dbNameshotpep,  .data$dbNamesdiamond, 
            sep="_", remove = F) %>%  
-      mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) 
-
+      mutate(dbCAN_names=str_replace_all(.data$dbCAN_names, "^_", "")) %>%
+      separate(.data$dbCAN_names, c("dbCAN_names"), sep="_") 
 
 
 ```
@@ -174,27 +182,25 @@ read_dbcan<-function(dbcan_path){
 ## Funcion de lectura de archivo
 
 ```{r, eval=FALSE, warning=FALSE, message=FALSE}
-%>%
-      separate(dbCAN_names, c("dbCAN_names"), sep="_") %>%
-      utate(dbCAN = case_when(str_detect(dbCAN_names, "CBM") ~ 
+%>% mutate(dbCAN = case_when(str_detect(.data$dbCAN_names, "CBM") ~ 
                                 "carbohydrate-binding module [CBM]",
-                              str_detect(dbCAN_names, "CE") ~ 
+                              str_detect(.data$dbCAN_names, "CE") ~ 
                                 "carbohydrate esterases [CEs]",
-                              str_detect(dbCAN_names, "GH") ~ 
+                              str_detect(.data$dbCAN_names, "GH") ~ 
                                 "glycoside hydrolases [GHs]",
-                              str_detect(dbCAN_names, "GT") ~ 
+                              str_detect(.data$dbCAN_names, "GT") ~ 
                                 "glycosyltransferases [GTs]",
-                              str_detect(dbCAN_names, "PL") ~ 
-                                "polysaccharide lyases [PLs]"))  %>%
-      mutate(across(where(is.character), str_trim))) %>%
-    dplyr::select(Bin_name,dbCAN_names) %>%
+                              str_detect(.data$dbCAN_names, "PL") ~ 
+                                "polysaccharide lyases [PLs]")) %>%
+      mutate_if(is.character, str_trim) %>%
+    dplyr::select(.data$Bin_name, .data$dbCAN_names) %>%
     calc_abundance(analysis = "dbCAN") %>% 
-    dplyr::select(-Scaffold_name)
+    dplyr::select(-.data$Scaffold_name))
   # Menssage --------------------------------------------------------------####
   initial<-dim(dbcan_df)
   final<-dim(dbcan_df %>%
-               filter( `#ofTools` >1))
-  signals<- dbcan_df %>% group_by(Signalp) %>% count()
+               filter( .data$`#ofTools` >1))
+  signals<- dbcan_df %>% group_by(.data$Signalp) %>% count()
 
   print(paste0("Input Genes = " , initial[1]))
   print(paste0("Output filtered Genes = " , final[1]))
@@ -205,62 +211,397 @@ read_dbcan<-function(dbcan_path){
 }
 ```
 
+
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-read_dbcan<-function(dbcan_table){
-library("readr")
-library(dplyr)
-library(tidyr)
-library(stringr)
-#reading data
-dbcan_df<-read.delim(dbcan_table, header = T, check.names = F)
-dbcan_df_format<- suppressWarnings(dbcan_df %>%
-  filter( `#ofTools` >1) %>%
-  separate(.data$`Gene ID`, c("Bin_name", "Scaffold_name"),
-           sep = "[_|-][s|S]caffold") %>%
-  mutate(Scaffold_name = paste0( "scaffold", .data$Scaffold_name),
-         .data$Scaffold_name) %>%
-  unite("Scaffold_name", c("Bin_name", "Scaffold_name"), remove=FALSE) %>%
-  mutate(hmmer2=str_replace_all(HMMER, "[[:punct:]]", "\t")) %>%
-  separate(hmmer2, c("dbNamesHMM"), sep="\t") %>%
-  mutate(hotpep2=str_replace_all(Hotpep, "[[:punct:]]", "\t")) %>%
-  separate(hotpep2, c("dbNameshotpep"), sep="\t") %>%
-  mutate(diamond2=str_replace_all(DIAMOND, "[[:punct:]]", "\t")) %>%
-  separate(diamond2, c("dbNamesdiamond"), sep="\t") %>%
-  unite("dbCAN_names", dbNamesHMM, dbNameshotpep, dbNamesdiamond,
-        sep="_", remove = F) %>%
-  mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) %>%
-  separate(dbCAN_names, c("dbCAN_names"), sep="_") %>%
-  mutate(dbCAN = case_when(
-    str_detect(dbCAN_names, "CBM") ~ "carbohydrate-binding module [CBM]",
-    str_detect(dbCAN_names, "CE") ~ "carbohydrate esterases [CEs]",
-    str_detect(dbCAN_names, "GH") ~ "glycoside hydrolases [GHs]",
-    str_detect(dbCAN_names, "GT") ~ "glycosyltransferases [GTs]",
-    str_detect(dbCAN_names, "PL") ~ "polysaccharide lyases [PLs]"
-  ))   %>%
-  mutate(across(where(is.character), str_trim)))
+library(tidyverse)
+read_dbcan<-function(dbcan_path){
+  ruta_dbcan<-dbcan_path
+  # Load all the data tables results ---------------------------------------####
+  lapply_read_delim_bind_rows <- function(path, pattern = "*overview.txt"){
+    files = list.files(path, pattern, full.names = TRUE)
+    lapply(files, read_delim, delim="\t") %>% bind_rows()
+  }
+  dbcan_df<-lapply_read_delim_bind_rows(ruta_dbcan)
+  # Reading data ----------------------------------------------------------####
+  dbcan_df_format<- suppressWarnings(
+    dbcan_df %>%
+      filter( .data$`#ofTools` >1) %>%
+      rename(Bin_name=.data$`Gene ID`) %>%
+      mutate( hmmer2=str_replace_all(.data$HMMER, "[[:punct:]]",  "\t")) %>%
+      separate(.data$hmmer2, c("dbNamesHMM"),  sep="\t") %>%
+      mutate(hotpep2=str_replace_all(.data$Hotpep, "[[:punct:]]", "\t")) %>%
+      separate(.data$hotpep2, c("dbNameshotpep"), sep="\t") %>%
+      mutate(diamond2=str_replace_all(.data$DIAMOND, "[[:punct:]]", "\t")) %>%
+      separate(.data$diamond2, c("dbNamesdiamond"), sep="\t") %>%
+      unite("dbCAN_names", .data$dbNamesHMM, .data$dbNameshotpep,  .data$dbNamesdiamond, 
+           sep="_", remove = F) %>%  
+      mutate(dbCAN_names=str_replace_all(.data$dbCAN_names, "^_", "")) %>%
+      separate(.data$dbCAN_names, c("dbCAN_names"), sep="_") %>%
+      mutate(dbCAN = case_when(str_detect(.data$dbCAN_names, "CBM") ~ 
+                                "carbohydrate-binding module [CBM]",
+                              str_detect(.data$dbCAN_names, "CE") ~ 
+                                "carbohydrate esterases [CEs]",
+                              str_detect(.data$dbCAN_names, "GH") ~ 
+                                "glycoside hydrolases [GHs]",
+                              str_detect(.data$dbCAN_names, "GT") ~ 
+                                "glycosyltransferases [GTs]",
+                              str_detect(.data$dbCAN_names, "PL") ~ 
+                                "polysaccharide lyases [PLs]")) %>%
+      mutate_if(is.character, str_trim) %>%
+    dplyr::select(.data$Bin_name, .data$dbCAN_names) %>%
+    calc_abundance(analysis = "dbCAN") %>% 
+    dplyr::select(-.data$Scaffold_name))
+  # Menssage --------------------------------------------------------------####
+  initial<-dim(dbcan_df)
+  final<-dim(dbcan_df %>%
+               filter( .data$`#ofTools` >1))
+  signals<- dbcan_df %>% group_by(.data$Signalp) %>% count()
 
-initial<-dim(dbcan_df)
-final<-dim(dbcan_df %>%
-      filter( `#ofTools` >1))
-signals<- dbcan_df %>% group_by(Signalp) %>% count()
+  print(paste0("Input Genes = " , initial[1]))
+  print(paste0("Output filtered Genes = " , final[1]))
+  print(paste0("Percentage remained = " , round(final[1]/initial[1]*100), "%"))
+  print(paste0("Number of Genes with no signals = " , signals[2]))
 
-print(paste0("Input scaffolds = " , initial[1]))
-print(paste0("Output filtered = " , final[1]))
-print(paste0("Percentage remained = " , round(final[1]/initial[1]*100), "%"))
-print(paste0("Number of scaffolds with no signals = " , signals[2]))
-return(dbcan_df_format)
+  return(dbcan_df_format)
 }
+
+calc_abundance<-function(tabla_toabundance,
+                         analysis=c("KEGG", "Pfam", "INTERPRO", "dbCAN")){
+  # Read table ------------------------------------------------------------####
+  KO_raw<-tabla_toabundance %>%
+    separate(.data$Bin_name, c("Bin_name", "Scaffold_name"),
+             sep = "[_|-][s|S]caffold") %>%
+    mutate(Scaffold_name = paste0( "scaffold", .data$Scaffold_name),
+           .data$Scaffold_name) %>%
+    unite("Scaffold_name", c("Bin_name", "Scaffold_name"), remove=FALSE)
+  # Selecting analysis ----------------------------------------------------####
+  if( analysis == "Pfam") {
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$Pfam) %>%
+      distinct()
+  } else if ( analysis == "KEGG") {
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$KO)
+  } else if ( analysis == "INTERPRO"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$Interpro) %>%
+      distinct()
+  } else if ( analysis == "TIGRFAM"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$TIGRFAM) %>%
+      distinct()
+  } else if ( analysis == "SUPERFAMILY"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$SUPERFAMILY) %>%
+      distinct()
+  } else if ( analysis == "SMART"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$SMART) %>%
+      distinct()
+  } else if ( analysis == "SFLD"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$SFLD) %>%
+      distinct()
+  } else if ( analysis == "ProSiteProfiles"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$ProSiteProfiles) %>%
+      distinct()
+  } else if ( analysis == "ProSitePatterns"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$ProSitePatterns) %>%
+      distinct()
+  } else if ( analysis == "ProDom"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$ProDom) %>%
+      distinct()
+  } else if ( analysis == "PRINTS"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$PRINTS) %>%
+      distinct()
+  } else if ( analysis == "PIRSF"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$PIRSF) %>%
+      distinct()
+  } else if ( analysis == "MobiDBLite"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$MobiDBLite) %>%
+      distinct()
+  } else if ( analysis == "Hamap"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$Hamap) %>%
+      distinct()
+  } else if ( analysis == "Gene3D"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$Gene3D) %>%
+      distinct()
+  } else if ( analysis == "Coils"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$Coils) %>%
+      distinct()
+  } else if ( analysis == "CDD"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$CDD) %>%
+      distinct()
+  } else if ( analysis == "dbCAN"){
+    KO_raw <- KO_raw %>% 
+      rename(tmp = .data$dbCAN_names) %>%
+      distinct()
+  }
+  # Calculate abundance ---------------------------------------------------####
+  KO_abundance<-KO_raw %>%
+    group_by(.data$Bin_name) %>%
+    distinct() %>%
+    count(.data$tmp) %>%
+    rename(Abundance = .data$n)%>%
+    ungroup()
+  # Write tibble -----------------------------------------------------------####
+  final_table_1 <- left_join(KO_raw, KO_abundance, 
+                             by=c("Bin_name", "tmp")) %>%
+    distinct() 
+  
+  if( analysis == "Pfam") {
+    final_table <- final_table_1 %>% 
+      rename(Pfam = .data$tmp) 
+  } else if ( analysis == "KEGG")  {
+    final_table <- final_table_1 %>% 
+      rename(KO = .data$tmp)
+  } else if ( analysis == "INTERPRO"){
+    final_table <- final_table_1 %>% 
+      rename(INTERPRO = .data$tmp)
+  } else if ( analysis == "TIGRFAM"){
+    final_table <- final_table_1 %>% 
+      rename(TIGRFAM = .data$tmp)
+  } else if ( analysis == "SUPERFAMILY"){
+    final_table <- final_table_1 %>% 
+      rename(SUPERFAMILY = .data$tmp)
+  } else if ( analysis == "SMART"){
+    final_table <- final_table_1 %>% 
+      rename(SMART = .data$tmp)
+  } else if ( analysis == "SFLD"){
+    final_table <- final_table_1 %>% 
+      rename(SFLD = .data$tmp)
+  } else if ( analysis == "ProSiteProfiles"){
+    final_table <- final_table_1 %>% 
+      rename(ProSiteProfiles = .data$tmp)
+  } else if ( analysis == "ProSitePatterns"){
+    final_table <- final_table_1 %>% 
+      rename(ProSitePatterns = .data$tmp)
+  } else if ( analysis == "ProDom"){
+    final_table <- final_table_1 %>% 
+      rename(ProDom = .data$tmp)
+  } else if ( analysis == "PRINTS"){
+    final_table <- final_table_1 %>% 
+      rename(PRINTS = .data$tmp)
+  } else if ( analysis == "PIRSF"){
+    final_table <- final_table_1 %>% 
+      rename(PIRSF = .data$tmp)
+  } else if ( analysis == "MobiDBLite"){
+    final_table <- final_table_1 %>% 
+      rename(MobiDBLite = .data$tmp)
+  } else if ( analysis == "Hamap"){
+    final_table <- final_table_1 %>% 
+      rename(Hamap = .data$tmp)
+  } else if ( analysis == "Gene3D"){
+    final_table <- final_table_1 %>% 
+      rename(Gene3D = .data$tmp)
+  } else if ( analysis == "Coils"){
+    final_table <- final_table_1 %>% 
+      rename(Coils = .data$tmp)
+  } else if ( analysis == "CDD"){
+    final_table <- final_table_1 %>% 
+      rename(CDD = .data$tmp)
+  } else if ( analysis == "dbCAN"){
+    final_table <- final_table_1 %>% 
+      rename(dbCAN = .data$tmp)
+  } 
+  
+  
+  return(final_table)
+} 
+
 
 ```
 ---
 ## Probando la función
 
 ```{r, warning=FALSE, message=FALSE}
-data_dbcan<-"../Data/Prueba1_Bin_154_2_1.fna.faaoverview.txt"
-table_test<-read_dbcan(dbcan_table = data_dbcan)
 
-head(table_test[-1], n = 4)
+data_dbcan<-"../Data/"
+table_test<-read_dbcan(data_dbcan)
+
+head(table_test)
+
+```
+---
+
+# Funcion para la visualización de datos en bubble plot
+
+[Liga a la función](https://github.com/Steph0522/Rbims_workflow/blob/main/R/2022_08_05-PLOT-bubble_dbcan.R)
+
+```{r,eval=FALSE}
+bubble_dbcan<-function(tibble_dbcan,
+                    x_axis, 
+                    y_axis,
+                    data_experiment=NULL,
+                    color_character=NULL,
+                    order_bins=NULL,
+                    order_metabolism=NULL,
+                    color_pallet=NULL, 
+                    range_size=NULL,
+                    x_labs=TRUE,
+                    y_labs=TRUE,
+                    text_x=NULL,
+                    text_y=NULL){
+ ..........
+  return(plot_bubble)
+}
+
+```
+---
+
+# Corriendo la función de bubble plot
+
+```{r, echo=FALSE}
+bubble_dbcan<-function(tibble_dbcan,
+                    x_axis, 
+                    y_axis,
+                    data_experiment=NULL,
+                    color_character=NULL,
+                    order_bins=NULL,
+                    order_metabolism=NULL,
+                    color_pallet=NULL, 
+                    range_size=NULL,
+                    x_labs=TRUE,
+                    y_labs=TRUE,
+                    text_x=NULL,
+                    text_y=NULL){
+  # Enquoting -------------------------------------------------------------####
+  x_axis_enquo <- enquo(x_axis)
+  y_axis_enquo <- enquo(y_axis)
+  x_axis_label <- as_label(x_axis_enquo)
+  y_axis_label <- as_label(y_axis_enquo)
+  color_character_enquo <- enquo(color_character)
+  # Checking axis ---------------------------------------------------------####
+  if( x_axis_label  != "Bin_name") {
+    y_axis_enquo<-enquo(x_axis) 
+    x_axis_enquo<-enquo(y_axis)
+    x_axis_label<-as_label(x_axis_enquo)
+    y_axis_label<-as_label(y_axis_enquo)
+  } 
+#   Checking the color ----------------------------------------------------####
+ if(is.null(color_pallet) == T){
+    color_pallet<-as.vector(pals::cols25(20))
+  }
+  # Checking the size -----------------------------------------------------####
+  if(is.null(range_size) == T){
+    range_size<-c(1,5)
+  }
+  # Checking the xlabs ----------------------------------------------------####
+  if(isTRUE(x_labs) == T){
+    x_labs<-x_axis_enquo
+  } else if (isTRUE(x_labs) == F) {
+    x_labs<-NULL
+  }
+  # Checking the ylabs ----------------------------------------------------####
+  if(isTRUE(y_labs) == T){
+    y_labs<-y_axis_enquo
+  } else if (isTRUE(y_labs) == F) {
+    y_labs<-NULL
+  }
+  # Checking the text_x ----------------------------------------------------####
+  if(is.null(text_x) == T){
+    text_x<-7
+  }
+  # Checking the text_x ----------------------------------------------------####
+  if(is.null(text_y) == T){
+    text_y<-7
+  }
+  
+  # Join data experiment --------------------------------------------------####
+  if(is.null(data_experiment) == F){
+   tibble_dbcan<-tibble_dbcan %>%
+      left_join(data_experiment, by="Bin_name")
+  }
+  # Checking the order ---------------------------------------------------####
+  if(is.null(order_metabolism) == T){
+    order_metabolism<-tibble_dbcan %>%
+      ungroup() %>%
+      select({{y_axis_enquo}}) %>%
+      distinct() %>%
+      pull()
+  }
+  # Checking the order ---------------------------------------------------####
+  if(is.null(order_bins) == T){
+    order_bins<-sort(unique(tibble_dbcan$Bin_name))
+  }
+  # Checking experiment ---------------------------------------------------####
+  if(is.null(data_experiment) == T){
+    data_experiment <- NULL
+  }
+  # Normal / upside -------------------------------------------------------####
+  rm(x_axis_enquo, y_axis_enquo, x_axis_label, y_axis_label)
+  x_axis_enquo <- enquo(x_axis)
+  y_axis_enquo <- enquo(y_axis)
+  x_axis_label <- as_label(x_axis_enquo)
+  y_axis_label <- as_label(y_axis_enquo)
+  # Plot ------------------------------------------------------------------####
+  if(x_axis_label == "Bin_name") {
+    plot_bubble<-ggplot(tibble_dbcan,
+                        aes(x= factor(!!x_axis_enquo, 
+                                      levels = !!order_bins),
+                            y= factor(!!y_axis_enquo, 
+                                      levels = !!order_metabolism),
+                            size= .data$Abundance,
+                            color= !!color_character_enquo)) +
+      geom_point(alpha=0.5) +
+      scale_size(range =range_size) +
+      scale_color_manual(values = color_pallet) +
+      theme_linedraw() +
+      theme(axis.text.x = element_text(size=text_x, 
+                                       angle = 45, 
+                                       hjust = 1, 
+                                       vjust = 1),
+            axis.text.y = element_text(size=text_y))+
+      xlab(x_labs) + 
+      ylab(y_axis_enquo)
+  } else if (x_axis_label != "Bin_name" ) {
+    plot_bubble<-ggplot(tibble_dbcan,
+                        aes(x= factor(!!x_axis_enquo, 
+                                      levels = !!order_metabolism),
+                            y= factor(!!y_axis_enquo, 
+                                      levels = !!order_bins),
+                            size= .data$Abundance,
+                            color= !!color_character_enquo)) +
+      geom_point(alpha=0.5) +
+      scale_size(range = c(1,5)) +
+      scale_color_manual(values = color_pallet) +
+      theme_linedraw() +
+      theme(axis.text.x = element_text(size=text_x, 
+                                       angle = 45, 
+                                       hjust = 1, 
+                                       vjust = 1),
+            axis.text.y = element_text(size=text_y))+
+      xlab(x_labs) + 
+      ylab(y_labs)
+  }
+  
+  return(plot_bubble)
+}
 
 ```
 
+```{r, eval=FALSE}
+Metadatos<- data.frame(
+  Bin_name = unique(table_test$Bin_name),
+  Specie = c("Specie_a", "Specie_b", "Specie_c",
+             "Specie_d", "Specie_e", "Specie_f")) 
+bubble_dbcan(tibble_dbcan = table_test,
+            x_axis = Bin_name, 
+            y_axis = dbCAN,
+            range_size = c(1,10),
+            data_experiment = Metadatos,
+            color_character = Specie,
+            y_labs=FALSE,
+            x_labs=FALSE)  
+```
 
