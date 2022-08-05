@@ -36,9 +36,17 @@ class: center, middle
 
 # dbCAN 
 
-### a web resource for automated **C**arbohydrate-active enzyme **AN**notation
+### a web resource for automated **C**arbohydrate-active enzyme **AN**notation 
+Yanbin Yin, Xizeng Mao, Jincai Yang, Xin Chen, Fenglou Mao, Ying Xu, dbCAN: a web resource for automated carbohydrate-active enzyme annotation, Nucleic Acids Research, Volume 40, Issue W1, 1 July 2012, Pages W445–W451, [Liga al artículo original](https://doi.org/10.1093/nar/gks479)
 
 El metaservidor dbCAN es una base de  datos para la anotación automática de enzimas activas de carbohidratos, financiado por la NSFs. Recursos similares en la web incluyen CAZy, CAT (obsoleto) y dbCAN-sub. 
+
+---
+class: center, middle
+
+# dbCAN 
+
+### a web resource for automated **C**arbohydrate-active enzyme **AN**notation 
 
 El metaservidor dbCAN2 es una versión actualizada del servidor web dbCAN original.
 
