@@ -87,7 +87,7 @@ class: inverse, center, middle
 ---
 
 ## Funcion de lectura de archivo
-```{r, eval=FALSE}
+```{r, eval=FALSE, warning=FALSE, message=FALSE}
 dbcan_table<- data_dbcan
 read_dbcan<-function(dbcan_table){
 library("readr")
@@ -116,7 +116,7 @@ dbcan_df_format<- suppressWarnings(dbcan_df %>%
 
 ## Funcion de lectura de archivo
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, warning=FALSE, message=FALSE}
 %>% mutate(dbCAN_names=str_replace_all(dbCAN_names, "^_", "")) %>%
   separate(dbCAN_names, c("dbCAN_names"), sep="_") %>%
   mutate(dbCAN = case_when(
@@ -141,8 +141,7 @@ return(dbcan_df)
 }
 ```
 
-```{r, echo=FALSE}
-dbcan_table<- data_dbcan
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 read_dbcan<-function(dbcan_table){
 library("readr")
 library(dplyr)
@@ -192,7 +191,7 @@ return(dbcan_df_format)
 ---
 ## Probando la función
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 data_dbcan<-"../Data/Prueba1_Bin_154_2_1.fna.faaoverview.txt"
 table_test<-read_dbcan(dbcan_table = data_dbcan)
 
@@ -200,4 +199,3 @@ head(table_test[-1], n = 4)
 
 ```
 
----
